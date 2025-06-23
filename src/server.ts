@@ -1,19 +1,27 @@
 import express from "express";
-const app = express()
-import dotenv from 'dotenv'
+import dotenv from "dotenv";
 import { sql } from "./utils/db.js";
-import blogRoutes from './routes/blog.js'
+import blogRoutes from "./routes/blog.js";
 import { v2 as cloudinary } from "cloudinary";
+import { connectRabbitMQ } from "./utils/rabbitmq.js";
+import cors from "cors";
 
 dotenv.config();
-
-const port = process.env.PORT
 
 cloudinary.config({
     cloud_name: process.env.Cloud_Name,
     api_key: process.env.Cloud_Api_Key,
-    api_secret: process.env.Cloud_Api_Secret
+    api_secret: process.env.Cloud_Api_Secret,
 });
+
+const app = express();
+
+app.use(express.json());
+app.use(cors());
+
+connectRabbitMQ();
+
+const port = process.env.PORT;
 
 async function initDB() {
     try {
@@ -28,9 +36,10 @@ async function initDB() {
         author VARCHAR(255) NOT NULL,
         create_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
-        `
+        `;
+
         await sql`
-        CREATE TABLE IF NOT EXISTS comment(
+        CREATE TABLE IF NOT EXISTS comments(
         id SERIAL PRIMARY KEY,
         comment VARCHAR(255) NOT NULL,
         userid VARCHAR(255) NOT NULL,
@@ -38,24 +47,27 @@ async function initDB() {
         blogid VARCHAR(255) NOT NULL,
         create_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
-        `
+        `;
+
         await sql`
         CREATE TABLE IF NOT EXISTS savedblogs(
         id SERIAL PRIMARY KEY,
         userid VARCHAR(255) NOT NULL,
-        blogid TEXT NOT NULL,
+        blogid VARCHAR(255) NOT NULL,
         create_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         `;
-        console.log("databse initialized successfully!")
 
+        console.log("database initialized successfully");
     } catch (error) {
-        console.log("Error initDb:", error)
+        console.log("Error initDb", error);
     }
 }
 
-app.use('/api/v1', blogRoutes)
+app.use("/api/v1", blogRoutes);
 
-await initDB()
-
-app.listen(port, () => console.log(`server is running on http://localhost:${port}`))
+initDB().then(() => {
+    app.listen(port, () => {
+        console.log(`Server is running on http://localhost:${port}`);
+    });
+});
